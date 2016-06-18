@@ -1,8 +1,26 @@
+* {
+  padding: 0; margin: 0;
+}
 body {
-  padding: 50px;
+  margin: 8px;
+  background-color: #eee;
   font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
 }
-
 a {
   color: #00B7FF;
+}
+.disp {
+  height: 360px;
+  overflow-y: scroll;
+  background: #fff;
+  padding: 10px;
+  border: 1px solid #aaa;
+}
+.mobile-form > div {
+  margin: 10px 0;
+}
+.mobile-form input[type="text"],
+.mobile-form input[type="password"],
+.mobile-form button[type="submit"] {
+  padding: 4px; width: 100%;
 }
