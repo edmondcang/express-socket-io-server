@@ -16,6 +16,9 @@ a {
   padding: 10px;
   border: 1px solid #aaa;
 }
+.disp-short {
+  height: 180px;
+}
 .mobile-form > div {
   margin: 10px 0;
 }
