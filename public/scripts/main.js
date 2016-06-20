@@ -5,7 +5,7 @@ var Socket = (function ($) {
   var client;
   return {
     init: function () {
-      client = io.connect('http://dev.shopscal.com');
+      client = io.connect('http://rt.glacemont.com:4100');
       client.on('connection', function (data) {
         console.log(data);
         View.render('login-form');
@@ -261,7 +261,7 @@ var View = (function ($) {
   };
 })(jQuery);
 
-$(window).load(function () {
+$(document).ready(function () {
 
   Socket.init();
 

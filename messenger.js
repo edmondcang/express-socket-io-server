@@ -80,6 +80,9 @@ module.exports = (function () {
         });
 
         socket.on('disconnect', function () {
+          if (persons[socket.id]) {
+            console.log(persons[socket.id].name + ' disconnected');
+          }
           if (rooms.enquiry.persons[socket.id]) {
             io.to(rooms.enquiry.id).emit('update', rooms.enquiry.persons[socket.id].name + ' left');
           }

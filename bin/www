@@ -9,11 +9,9 @@ var debug = require('debug')('express-socket-io-server:server');
 var http = require('http');
 var messenger = require('../messenger');
 
-/**
- * Get port from environment and store in Express.
- */
-
 var port = normalizePort(process.env.PORT || '3000');
+var portSocket = normalizePort(process.env.PORT_SOCKET || '4100');
+
 app.set('port', port);
 
 /**
@@ -21,7 +19,8 @@ app.set('port', port);
  */
 
 var server = http.createServer(app);
-var io = require('socket.io')(server);
+var socketServer = http.createServer();
+var io = require('socket.io')(socketServer);
 
 messenger.init(io);
 
@@ -32,6 +31,11 @@ messenger.init(io);
 server.listen(port);
 server.on('error', onError);
 server.on('listening', onListening);
+
+socketServer.listen(portSocket);
+socketServer.on('listening', function () {
+  debug('Socket server listening on port ' + portSocket);
+});
 
 /**
  * Normalize a port into a number, string, or false.
@@ -90,5 +94,5 @@ function onListening() {
   var bind = typeof addr === 'string'
     ? 'pipe ' + addr
     : 'port ' + addr.port;
-  debug('Listening on ' + bind);
+  debug('HTTP server listening on ' + bind);
 }
