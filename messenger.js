@@ -76,7 +76,6 @@ module.exports = (function () {
           if (names.indexOf(data.name) > -1) return;
 
           var person = new Person();
-          console.log(data.id);
           person.client_id = data.client_id ? data.client_id : Helper.keygen(32);
           person.socket_id = socket.id;
           if (data.name && data.email) {

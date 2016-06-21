@@ -159,7 +159,8 @@ var View = (function ($) {
     $leaveRoom.click(function (e) {
       console.log('leave-room');
 
-      Storage.removeItem('id');
+      Storage.removeItem('client_id');
+      Storage.removeItem('socket_id');
       Storage.removeItem('name');
       Storage.removeItem('type');
       Storage.removeItem('password');
