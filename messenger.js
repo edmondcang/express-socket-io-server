@@ -4,7 +4,7 @@ var Person = function () {
 module.exports = (function () {
   var maxConn = 10;
   var total = 0;
-  var numAdmins = 0;
+  var loggedInAdmins = [];
   var names = [];
   var persons = {};
   var rooms = {
@@ -32,6 +32,15 @@ module.exports = (function () {
 
         socket.on('login', function (data) {
           if (admins[data.name] && admins[data.name] == data.password) {
+
+            if (loggedInAdmins.indexOf(data.name) > -1) {
+              console.log(data.name + ' already logged in');
+              console.log(loggedInAdmins);
+              return;
+            }
+
+            loggedInAdmins.push(data.name);
+
             var person = new Person();
             person.id = socket.id;
             person.name = data.name;
@@ -66,6 +75,7 @@ module.exports = (function () {
           person.id = socket.id;
           person.name = data.name;
           person.email = data.email;
+          person.type = 'user';
           persons[socket.id] = person;
 
           socket.join(rooms.enquiry.id);
@@ -81,6 +91,9 @@ module.exports = (function () {
 
         socket.on('disconnect', function () {
           if (persons[socket.id]) {
+            if (persons[socket.id].type == 'admin') {
+              loggedInAdmins.splice(loggedInAdmins.indexOf(persons[socket.id].name), 1);
+            }
             console.log(persons[socket.id].name + ' disconnected');
           }
           if (rooms.enquiry.persons[socket.id]) {

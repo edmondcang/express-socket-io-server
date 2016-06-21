@@ -230,10 +230,10 @@ var View = (function ($) {
       console.log('updateRoomList', data);
       var html = '';
       for (var id in data) {
-        if (id == Storage.getItem('id') || data[id].type == 'admin') continue;
+        if (id == Storage.getItem('id')) continue;
         html += `
           <div>
-            <a href="#" class="chat-with" data-id="${ id }">${ data[id].name } (${ data[id].email })</a>
+            <a href="#" class="chat-with" data-id="${ id }">${ data[id].name + ( data[id].type == 'user' ? ' (' + data[id].email + ')' : '' ) }</a>
           </div>
         `;
       }
