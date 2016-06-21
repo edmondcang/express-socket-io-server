@@ -1,3 +1,5 @@
+var Helper = require('./Helper');
+
 var Person = function () {
 };
 
@@ -42,7 +44,7 @@ module.exports = (function () {
             loggedInAdmins.push(data.name);
 
             var person = new Person();
-            person.id = socket.id;
+            person.id = Helper.keygen(32);
             person.name = data.name;
             person.type = 'admin';
             persons[socket.id] = person;
@@ -69,20 +71,29 @@ module.exports = (function () {
 
         socket.on('join', function (data) {
 
+          // TODO: error handling
           if (names.indexOf(data.name) > -1) return;
 
           var person = new Person();
-          person.id = socket.id;
-          person.name = data.name;
-          person.email = data.email;
-          person.type = 'user';
+          console.log(data.id);
+          person.id = data.id ? data.id : Helper.keygen(32);
+          if (data.name && data.email) {
+            names.push(data.name);
+            person.name = data.name;
+            person.email = data.email;
+            person.type = 'user';
+          }
+          else {
+            person.name = 'anonymous';
+            person.email = '';
+            person.type = 'anonymous';
+          }
           persons[socket.id] = person;
 
           socket.join(rooms.enquiry.id);
           rooms.enquiry.persons[socket.id] = person;
 
-          names.push(data.name);
-          socket.emit('joined', { id: socket.id, name: person.name, email: person.email, room: rooms.enquiry.id });
+          socket.emit('joined', { id: person.id, name: person.name, email: person.email, room: rooms.enquiry.id });
 
           io.to(rooms.enquiry.id).emit('update', person.name + ' joined');
           io.to(rooms.enquiry.id).emit('update-persons', rooms.enquiry.persons);

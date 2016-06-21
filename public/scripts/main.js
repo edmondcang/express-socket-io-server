@@ -172,8 +172,13 @@ var View = (function ($) {
       var name = $userName.val();
       var email = $email.val();
       console.log(name, email);
-      if (!$.trim(name).length || !$.trim(email).length) return;
-      Socket.getClient().emit('join', {name: name, email: email});
+      var data = {};
+      if ($.trim(name).length && $.trim(email).length) {
+        data = { name: name, email: email };
+      }
+      else {
+        Socket.getClient().emit('join', data);
+      }
       console.log('emitted join');
       Storage.setItem('name', name);
       Storage.setItem('email', email);
@@ -272,8 +277,11 @@ $(document).ready(function () {
     if (Storage.getItem('type') == 'admin') {
       Socket.getClient().emit('login', { name: Storage.getItem('name'), password: Storage.getItem('password') });
     }
-    else if (Storage.getItem('name')) {
+    else if (Storage.getItem('type') == 'user' && Storage.getItem('name')) {
       Socket.getClient().emit('join', { name: Storage.getItem('name'), email: Storage.getItem('email') });
+    }
+    else {
+      Socket.getClient().emit('join', { id: Storage.getItem('id') });
     }
   }
 });
