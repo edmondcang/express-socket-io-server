@@ -11,11 +11,13 @@ var Socket = (function ($) {
         View.render('login-form');
       });
       client.on('logged-in', function (data) {
-        Storage.setItem('id', data.id);
+        Storage.setItem('socket_id', data.socket_id);
+        Storage.setItem('client_id', data.client_id);
         View.render('message-admin', data);
       });
       client.on('joined', function (data) {
-        Storage.setItem('id', data.id);
+        Storage.setItem('socket_id', data.socket_id);
+        Storage.setItem('client_id', data.client_id);
         View.render('message', data);
       });
       client.on('update', function (data) {
@@ -32,7 +34,7 @@ var Socket = (function ($) {
         View.pushContent(`<p>${ data.from.name }: ${ data.content }</p>`);
       });
       client.on('invited', function (person) {
-        chatWith.id = person.id;
+        chatWith.socket_id = person.socket_id;
       });
     },
     getClient: function () {
@@ -89,7 +91,7 @@ var View = (function ($) {
       return `
         <div class="mobile-form">
           <div>
-            ${data.id} | ${data.name} | ${data.email} | ${data.room}
+            ${data.client_id} | ${data.name} | ${data.email} | ${data.room}
             <button id="leave-room" class="btn btn-default">Leave</button>
           </div>
           <div>
@@ -105,7 +107,7 @@ var View = (function ($) {
       return `
         <div class="mobile-form">
           <div>
-            ${data.id} | ${data.name} | ${data.room}
+            ${data.client_id} | ${data.name} | ${data.room}
             <button id="leave-room" class="btn btn-default">Leave</button>
           </div>
           <div>
@@ -149,7 +151,7 @@ var View = (function ($) {
         if (msg.length) {
           $msgInput.val('');
           console.log(chatWith);
-          Socket.getClient().emit('send', { to: chatWith.id, content: msg });
+          Socket.getClient().emit('send', { to: chatWith.socket_id, content: msg });
         }
       }
     });
@@ -203,7 +205,7 @@ var View = (function ($) {
           var password = $password.val();
           console.log(admin, password);
           if (!$.trim(admin).length || !$.trim(password).length) return;
-          Socket.getClient().emit('login', {name: admin, password: password});
+          Socket.getClient().emit('login', { name: admin, password: password });
           Storage.setItem('name', admin);
           Storage.setItem('password', password);
           Storage.setItem('type', 'admin');
@@ -234,24 +236,24 @@ var View = (function ($) {
     updateRoomList: function (data) {
       console.log('updateRoomList', data);
       var html = '';
-      for (var id in data) {
-        if (id == Storage.getItem('id')) continue;
+      for (var socket_id in data) {
+        if (socket_id == Storage.getItem('socket_id')) continue;
         html += `
           <div>
-            <a href="#" class="chat-with" data-id="${ id }">${ data[id].name + ( data[id].type == 'user' ? ' (' + data[id].email + ')' : '' ) }</a>
+            <a href="#" class="chat-with" data-socket_id="${ socket_id }">${ data[socket_id].name + ( data[socket_id].type == 'user' ? ' (' + data[socket_id].email + ')' : '' ) }</a>
           </div>
         `;
       }
       $roomList.html(html);
       $('.chat-with').click(function (e) {
-        chatWith.id = $(this).data('id');
+        chatWith.socket_id = $(this).data('socket_id');
         chatWith.title = $(this).html();
         $chatWithTitle.show().html(chatWith.title);
         $disp.show();
         $msgInput.show().focus();
 
-        Socket.getClient().emit('invite', { to: chatWith.id, from: Storage.getItem('id') });
-        Socket.getClient().emit('send', { to: chatWith.id, content: '你好，我係 '+Storage.getItem('name')+'。請問有咩可以幫到你' });
+        Socket.getClient().emit('invite', { to: chatWith.socket_id, from: Storage.getItem('socket_id') });
+        Socket.getClient().emit('send', { to: chatWith.socket_id, content: '你好，我係 ' + Storage.getItem('name') + '。請問有咩可以幫到你' });
       });
       return this;
     },
@@ -273,7 +275,7 @@ $(document).ready(function () {
   var $app = $('#app');
   View.init($app);
 
-  if (Storage.getItem('id')) {
+  if (Storage.getItem('client_id')) {
     if (Storage.getItem('type') == 'admin') {
       Socket.getClient().emit('login', { name: Storage.getItem('name'), password: Storage.getItem('password') });
     }
@@ -281,7 +283,7 @@ $(document).ready(function () {
       Socket.getClient().emit('join', { name: Storage.getItem('name'), email: Storage.getItem('email') });
     }
     else {
-      Socket.getClient().emit('join', { id: Storage.getItem('id') });
+      Socket.getClient().emit('join', { id: Storage.getItem('client_id') });
     }
   }
 });

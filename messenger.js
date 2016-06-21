@@ -44,7 +44,8 @@ module.exports = (function () {
             loggedInAdmins.push(data.name);
 
             var person = new Person();
-            person.id = Helper.keygen(32);
+            person.client_id = Helper.keygen(32);
+            person.socket_id = socket.id;
             person.name = data.name;
             person.type = 'admin';
             persons[socket.id] = person;
@@ -52,7 +53,7 @@ module.exports = (function () {
             socket.join(rooms.enquiry.id);
             rooms.enquiry.persons[socket.id] = person;
 
-            socket.emit('logged-in', { id: socket.id, name: person.name, room: rooms.enquiry.id });
+            socket.emit('logged-in', { client_id: person.client_id, socket_id: socket.id, name: person.name, room: rooms.enquiry.id });
 
             io.to(rooms.enquiry.id).emit('update', person.name + ' joined');
             io.to(rooms.enquiry.id).emit('update-persons', rooms.enquiry.persons);
@@ -76,7 +77,8 @@ module.exports = (function () {
 
           var person = new Person();
           console.log(data.id);
-          person.id = data.id ? data.id : Helper.keygen(32);
+          person.client_id = data.client_id ? data.client_id : Helper.keygen(32);
+          person.socket_id = socket.id;
           if (data.name && data.email) {
             names.push(data.name);
             person.name = data.name;
@@ -93,7 +95,7 @@ module.exports = (function () {
           socket.join(rooms.enquiry.id);
           rooms.enquiry.persons[socket.id] = person;
 
-          socket.emit('joined', { id: person.id, name: person.name, email: person.email, room: rooms.enquiry.id });
+          socket.emit('joined', { socket_id: person.socket_id, client_id: person.client_id, name: person.name, email: person.email, room: rooms.enquiry.id });
 
           io.to(rooms.enquiry.id).emit('update', person.name + ' joined');
           io.to(rooms.enquiry.id).emit('update-persons', rooms.enquiry.persons);
