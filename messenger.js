@@ -66,8 +66,9 @@ module.exports = (function () {
 
         socket.on('send', function (data) {
           console.log(data);
-          socket.broadcast.to(data.to).emit('message', { from: persons[socket.id], content: data.content });
-          socket.emit('message', { from: persons[socket.id], content: data.content });
+          var d = new Date();
+          socket.broadcast.to(data.to).emit('message', { from: persons[socket.id], content: data.content, time: d.getHours() + ':' + d.getMinutes() });
+          socket.emit('message', { from: persons[socket.id], content: data.content, time: d.getHours() + ':' + d.getMinutes() });
         });
 
         socket.on('join', function (data) {
@@ -76,7 +77,15 @@ module.exports = (function () {
           if (names.indexOf(data.name) > -1) return;
 
           var person = new Person();
-          person.client_id = data.client_id ? data.client_id : Helper.keygen(32);
+
+          // client_id provided, this guy had connection before
+          if (data.client_id) {
+            person.client_id = data.client_id;
+          }
+          // New client_id assigned to those who make first time connection
+          else {
+            person.client_id = Helper.keygen(32);
+          }
           person.socket_id = socket.id;
           if (data.name && data.email) {
             names.push(data.name);
