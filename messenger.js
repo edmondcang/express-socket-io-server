@@ -9,7 +9,7 @@ module.exports = (function () {
   var total = 0;
   var numAvailable = [];
   var numAssigned = {};
-  var loggedInAdmins = [];
+  var loggedInUsers = [];
   var names = [];
   var persons = {};
   var rooms = {
@@ -41,15 +41,16 @@ module.exports = (function () {
         }
 
         socket.on('login', function (data) {
-          if (admins[data.name] && admins[data.name] == data.password) {
+          //if (admins[data.name] && admins[data.name] == data.password) {
+          if (data.name) {
 
-            if (loggedInAdmins.indexOf(data.name) > -1) {
+            if (loggedInUsers.indexOf(data.name) > -1) {
               console.log(data.name + ' already logged in');
-              console.log(loggedInAdmins);
+              console.log(loggedInUsers);
               return;
             }
 
-            loggedInAdmins.push(data.name);
+            loggedInUsers.push(data.name);
 
             var person = new Person();
             person.client_id = Helper.keygen(32);
@@ -61,7 +62,8 @@ module.exports = (function () {
             socket.join(rooms.enquiry.id);
             rooms.enquiry.persons[socket.id] = person;
 
-            socket.emit('logged-in', { client_id: person.client_id, socket_id: socket.id, name: person.name, room: rooms.enquiry.id });
+            socket.emit('logged-in', person);
+            //socket.emit('logged-in', { client_id: person.client_id, socket_id: socket.id, name: person.name, room: rooms.enquiry.id });
 
             io.to(rooms.enquiry.id).emit('update', person.name + ' joined');
             io.to(rooms.enquiry.id).emit('update-persons', rooms.enquiry.persons);
@@ -135,7 +137,7 @@ module.exports = (function () {
           console.log(numAvailable);
           if (persons[socket.id]) {
             if (persons[socket.id].type == 'admin') {
-              loggedInAdmins.splice(loggedInAdmins.indexOf(persons[socket.id].name), 1);
+              loggedInUsers.splice(loggedInUsers.indexOf(persons[socket.id].name), 1);
             }
             else if (persons[socket.id].type == 'anonymous') {
               if (numAnonymous > 0)
