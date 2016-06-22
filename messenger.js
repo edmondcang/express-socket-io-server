@@ -4,8 +4,10 @@ var Person = function () {
 };
 
 module.exports = (function () {
+  var numAnonymous = 0;
   var maxConn = 10;
   var total = 0;
+  var numAvailable = [];
   var loggedInAdmins = [];
   var names = [];
   var persons = {};
@@ -20,6 +22,11 @@ module.exports = (function () {
     'Tuby Lam': 'secret',
     'Joanne Wong': 'secret',
   };
+
+  for (var i = maxConn; i >= 1; i--) {
+    numAvailable.push(i);
+  }
+
   return {
     init: function (io) {
 
@@ -72,6 +79,7 @@ module.exports = (function () {
         });
 
         socket.on('join', function (data) {
+          var newClient = false;
 
           // TODO: error handling
           if (names.indexOf(data.name) > -1) return;
@@ -84,9 +92,12 @@ module.exports = (function () {
           }
           // New client_id assigned to those who make first time connection
           else {
+            newClient = true;
             person.client_id = Helper.keygen(32);
           }
+
           person.socket_id = socket.id;
+
           if (data.name && data.email) {
             names.push(data.name);
             person.name = data.name;
@@ -94,9 +105,15 @@ module.exports = (function () {
             person.type = 'user';
           }
           else {
-            person.name = 'anonymous';
+            numAnonymous++;
+            var num = numAvailable.pop();
+            if (!num) {
+              num = 1;
+            }
+            person.name = '訪客' + num;
             person.email = '';
             person.type = 'anonymous';
+            person.assignation = num;
           }
           persons[socket.id] = person;
 
@@ -108,20 +125,30 @@ module.exports = (function () {
           io.to(rooms.enquiry.id).emit('update', person.name + ' joined');
           io.to(rooms.enquiry.id).emit('update-persons', rooms.enquiry.persons);
 
+          if (newClient && person.type == 'anonymous') {
+            var d = new Date();
+            socket.emit('message', { from: { name: 'ShoppingGAI' }, content: '請問有甚麼問題需要幫忙嗎？', time: d.getHours() + ':' + d.getMinutes() });
+          }
         });
 
         socket.on('disconnect', function () {
+          console.log('someone out');
           if (persons[socket.id]) {
             if (persons[socket.id].type == 'admin') {
               loggedInAdmins.splice(loggedInAdmins.indexOf(persons[socket.id].name), 1);
             }
+            else if (persons[socket.id].type == 'anonymous') {
+              if (numAnonymous > 0)
+                numAnonymous--;
+              if (persons[socket.id].assignation)
+                numAvailable.push(person[socket.id].assignation);
+            }
             console.log(persons[socket.id].name + ' disconnected');
+            names.splice(names.indexOf(persons[socket.id].name), 1);
           }
           if (rooms.enquiry.persons[socket.id]) {
             io.to(rooms.enquiry.id).emit('update', rooms.enquiry.persons[socket.id].name + ' left');
           }
-          if (persons[socket.id])
-            names.splice(names.indexOf(persons[socket.id].name), 1);
           delete persons[socket.id];
           delete rooms.enquiry.persons[socket.id];
           io.to(rooms.enquiry.id).emit('update-persons', rooms.enquiry.persons);
