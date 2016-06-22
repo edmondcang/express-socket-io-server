@@ -8,6 +8,7 @@ module.exports = (function () {
   var maxConn = 10;
   var total = 0;
   var numAvailable = [];
+  var numAssigned = {};
   var loggedInAdmins = [];
   var names = [];
   var persons = {};
@@ -107,13 +108,12 @@ module.exports = (function () {
           else {
             numAnonymous++;
             var num = numAvailable.pop();
-            if (!num) {
-              num = 1;
-            }
+            numAssigned[socket.id] = num;
             person.name = '訪客' + num;
             person.email = '';
             person.type = 'anonymous';
             person.assignation = num;
+            console.log(numAvailable, numAssigned);
           }
           persons[socket.id] = person;
 
@@ -132,7 +132,7 @@ module.exports = (function () {
         });
 
         socket.on('disconnect', function () {
-          console.log('someone out');
+          console.log(numAvailable);
           if (persons[socket.id]) {
             if (persons[socket.id].type == 'admin') {
               loggedInAdmins.splice(loggedInAdmins.indexOf(persons[socket.id].name), 1);
@@ -140,8 +140,9 @@ module.exports = (function () {
             else if (persons[socket.id].type == 'anonymous') {
               if (numAnonymous > 0)
                 numAnonymous--;
-              if (persons[socket.id].assignation)
-                numAvailable.push(person[socket.id].assignation);
+              numAvailable.push(numAssigned[socket.id]);
+              delete numAssigned[socket.id];
+              console.log(numAvailable, numAssigned);
             }
             console.log(persons[socket.id].name + ' disconnected');
             names.splice(names.indexOf(persons[socket.id].name), 1);
