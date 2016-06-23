@@ -4,9 +4,11 @@
  * Module dependencies.
  */
 
+var fs = require('fs');
 var app = require('../app');
 var debug = require('debug')('express-socket-io-server:server');
 var http = require('http');
+var https = require('https');
 var messenger = require('../messenger');
 
 var port = normalizePort(process.env.PORT || '3000');
@@ -18,7 +20,13 @@ app.set('port', port);
  * Create HTTP server.
  */
 
+var credentials = {
+  //key: fs.readFileSync('/home/admin0/Code/express-socket-io-server/sslcert/private/key.pem'),
+  //crt: fs.readFileSync('/home/admin0/Code/express-socket-io-server/sslcert/cacert.pem'),
+};
+
 var server = http.createServer(app);
+//var socketServer = https.createServer(credentials);
 var socketServer = http.createServer();
 var io = require('socket.io')(socketServer);
 
