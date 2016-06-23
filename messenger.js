@@ -5,7 +5,7 @@ var Person = function () {
 
 module.exports = (function () {
   var numAnonymous = 0;
-  var maxConn = 10;
+  var maxConn = 20;
   var total = 0;
   var numAvailable = [];
   var numAssigned = {};
@@ -101,10 +101,11 @@ module.exports = (function () {
 
           person.socket_id = socket.id;
 
-          if (data.name && data.email) {
+          //if (data.name && data.email) {
+          if (data.name) {
             names.push(data.name);
             person.name = data.name;
-            person.email = data.email;
+            //person.email = data.email;
             person.type = 'user';
           }
           else {
@@ -127,7 +128,7 @@ module.exports = (function () {
           io.to(rooms.enquiry.id).emit('update', person.name + ' joined');
           io.to(rooms.enquiry.id).emit('update-persons', rooms.enquiry.persons);
 
-          if (newClient && person.type == 'anonymous') {
+          if (newClient && person.type != 'admin') {
             var d = new Date();
             socket.emit('message', { from: { name: 'ShoppingGAI' }, content: '請問有甚麼問題需要幫忙嗎？', time: d.getHours() + ':' + d.getMinutes() });
           }
