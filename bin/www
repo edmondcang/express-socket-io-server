@@ -12,7 +12,7 @@ var https = require('https');
 var messenger = require('../messenger');
 
 var port = normalizePort(process.env.PORT || '3000');
-var portSocket = normalizePort(process.env.PORT_SOCKET || '4100');
+var portSocket = normalizePort(process.env.PORT_SOCKET || '4000');
 
 app.set('port', port);
 
@@ -21,8 +21,8 @@ app.set('port', port);
  */
 
 var credentials = {
-  //key: fs.readFileSync('/home/admin0/Code/express-socket-io-server/sslcert/private/key.pem'),
-  //crt: fs.readFileSync('/home/admin0/Code/express-socket-io-server/sslcert/cacert.pem'),
+  //key: fs.readFileSync('/home/admin0/Certificates/mars.shoppinggai.com.key'),
+  //crt: fs.readFileSync('/home/admin0/Certificates/mars.shoppinggai.com.crt'),
 };
 
 var server = http.createServer(app);
