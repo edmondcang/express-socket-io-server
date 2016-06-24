@@ -19,10 +19,6 @@ module.exports = (function () {
       persons: {}
     }
   };
-  var admins = {
-    'Tuby Lam': 'secret',
-    'Joanne Wong': 'secret',
-  };
 
   for (var i = maxConn; i >= 1; i--) {
     numAvailable.push(i);
@@ -65,7 +61,8 @@ module.exports = (function () {
             socket.emit('logged-in', person);
             //socket.emit('logged-in', { client_id: person.client_id, socket_id: socket.id, name: person.name, room: rooms.enquiry.id });
 
-            io.to(rooms.enquiry.id).emit('update', person.name + ' joined');
+            var d = new Date();
+            io.to(rooms.enquiry.id).emit('update', { msg: person.name + ' 加入', time: d.getHours() + ':' + d.getMinutes() });
             io.to(rooms.enquiry.id).emit('update-persons', rooms.enquiry.persons);
           }
         });
@@ -151,7 +148,8 @@ module.exports = (function () {
             names.splice(names.indexOf(persons[socket.id].name), 1);
           }
           if (rooms.enquiry.persons[socket.id]) {
-            io.to(rooms.enquiry.id).emit('update', rooms.enquiry.persons[socket.id].name + ' left');
+            var d = new Date();
+            io.to(rooms.enquiry.id).emit('update', { msg: rooms.enquiry.persons[socket.id].name + ' 離開', time: d.getHours() + ':' + d.getMinutes() });
           }
           delete persons[socket.id];
           delete rooms.enquiry.persons[socket.id];

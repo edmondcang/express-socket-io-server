@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "DEBUG=express-socket-io-server:* nodemon bin/www",
-    "start": "forever -a start ./bin/www"
+    "start": "forever -a start ./bin/www",
+    "stop": "forever stop ./bin/www"
   },
   "dependencies": {
     "body-parser": "~1.15.1",
