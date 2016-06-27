@@ -149,7 +149,7 @@ module.exports = (function () {
           }
           if (rooms.enquiry.persons[socket.id]) {
             var d = new Date();
-            io.to(rooms.enquiry.id).emit('update', { msg: rooms.enquiry.persons[socket.id].name + ' 離開', time: d.getHours() + ':' + d.getMinutes() });
+            io.to(rooms.enquiry.id).emit('update', { msg: rooms.enquiry.persons[socket.id].name + ' 離開', time: d.getHours() + ':' + d.getMinutes(), type: 'user-left' });
           }
           delete persons[socket.id];
           delete rooms.enquiry.persons[socket.id];
