@@ -1,9 +1,13 @@
+var db1 = require('./db1');
 var Helper = require('./Helper');
 
 var Person = function () {
 };
 
 module.exports = (function () {
+  var timezoneAdjust = 8;
+  var openTime = 1000;
+  var closeTime = 1900;
   var numAnonymous = 0;
   var maxConn = 20;
   var total = 0;
@@ -23,6 +27,15 @@ module.exports = (function () {
   for (var i = maxConn; i >= 1; i--) {
     numAvailable.push(i);
   }
+
+  var _inTimeRange = function () {
+    var d = new Date();
+    var min = d.getMinutes();
+    if (min < 10) min = '0' + min;
+    var currentTime = parseInt('0' + (d.getHours() + timezoneAdjust) + min);
+    console.log(currentTime);
+    return (currentTime <= closeTime && currentTime >= openTime);
+  };
 
   return {
     init: function (io) {
@@ -49,7 +62,7 @@ module.exports = (function () {
             loggedInUsers.push(data.name);
 
             var person = new Person();
-            person.client_id = Helper.keygen(32);
+            person.client_key = Helper.keygen(32);
             person.socket_id = socket.id;
             person.name = data.name;
             person.type = 'admin';
@@ -59,7 +72,7 @@ module.exports = (function () {
             rooms.enquiry.persons[socket.id] = person;
 
             socket.emit('logged-in', person);
-            //socket.emit('logged-in', { client_id: person.client_id, socket_id: socket.id, name: person.name, room: rooms.enquiry.id });
+            //socket.emit('logged-in', { client_key: person.client_key, socket_id: socket.id, name: person.name, room: rooms.enquiry.id });
 
             var d = new Date();
             io.to(rooms.enquiry.id).emit('update', { msg: person.name + ' 加入', time: d.getHours() + ':' + d.getMinutes() });
@@ -86,14 +99,14 @@ module.exports = (function () {
 
           var person = new Person();
 
-          // client_id provided, this guy had connection before
-          if (data.client_id) {
-            person.client_id = data.client_id;
+          // client_key provided, this guy had connection before
+          if (data.client_key) {
+            person.client_key = data.client_key;
           }
-          // New client_id assigned to those who make first time connection
+          // New client_key assigned to those who make first time connection
           else {
             newClient = true;
-            person.client_id = Helper.keygen(32);
+            person.client_key = Helper.keygen(32);
           }
 
           person.socket_id = socket.id;
@@ -120,14 +133,21 @@ module.exports = (function () {
           socket.join(rooms.enquiry.id);
           rooms.enquiry.persons[socket.id] = person;
 
-          socket.emit('joined', { socket_id: person.socket_id, client_id: person.client_id, name: person.name, email: person.email, room: rooms.enquiry.id });
+          socket.emit('joined', { socket_id: person.socket_id, client_key: person.client_key, name: person.name, email: person.email, room: rooms.enquiry.id });
 
           io.to(rooms.enquiry.id).emit('update', person.name + ' joined');
           io.to(rooms.enquiry.id).emit('update-persons', rooms.enquiry.persons);
 
+          var d = new Date();
+          var tStr = d.getHours() + ':' + d.getMinutes();
+
+          if (!_inTimeRange()) {
+            socket.emit('message', { from: { name: '' }, content: '抱歉！現在已經超出了我們的辦公時間\n\n請留下你的短訊，我們會盡快回覆你⋯⋯', time: tStr });
+            return;
+          }
+
           if (newClient && person.type != 'admin') {
-            var d = new Date();
-            socket.emit('message', { from: { name: 'ShoppingGAI' }, content: '請問有甚麼問題需要幫忙嗎？', time: d.getHours() + ':' + d.getMinutes() });
+            socket.emit('message', { from: { name: 'ShoppingGAI' }, content: '請問有甚麼問題需要幫忙嗎？', time: tStr });
           }
         });
 
