@@ -5,6 +5,7 @@ var Person = function () {
 };
 
 module.exports = (function () {
+  var io = null;
   var timezoneAdjust = 8;
   var openTime = 1000;
   var closeTime = 1900;
@@ -24,6 +25,36 @@ module.exports = (function () {
     }
   };
 
+  var _updateUserList = function () {
+    db1.Q.fcall(
+      db1.mkPromise(`
+        SELECT * FROM persons WHERE type != 'admin'
+      `)
+    ).then(function (rows) {
+      var res = rows[0];
+      console.log(res);
+      var sorted = [];
+      var resOffline = [];
+      for (var i in res) {
+        for (var socket_id in rooms.enquiry.persons) {
+          if (rooms.enquiry.persons[socket_id].client_key == res[i].client_key) {
+            res[i].socket_id = socket_id;
+          }
+        }
+        if (res[i].socket_id) {
+          sorted.push(res[i]);
+        }
+        else {
+          resOffline.push(res[i]);
+        }
+      }
+      for (var i in resOffline) {
+        sorted.push(resOffline[i]);
+      }
+      io.to(rooms.enquiry.id).emit('update-persons', sorted);
+    });
+  };
+
   for (var i = maxConn; i >= 1; i--) {
     numAvailable.push(i);
   }
@@ -38,9 +69,11 @@ module.exports = (function () {
   };
 
   return {
-    init: function (io) {
+    init: function (IO) {
+      io = IO;
 
       io.on('connection', function (socket) {
+        console.log('connected');
         if (total == maxConn) {
           socket.disconnect();
         }
@@ -63,6 +96,7 @@ module.exports = (function () {
 
             var person = new Person();
             person.client_key = Helper.keygen(32);
+            person.client_id = Helper.keygen(32);
             person.socket_id = socket.id;
             person.name = data.name;
             person.type = 'admin';
@@ -75,8 +109,9 @@ module.exports = (function () {
             //socket.emit('logged-in', { client_key: person.client_key, socket_id: socket.id, name: person.name, room: rooms.enquiry.id });
 
             var d = new Date();
-            io.to(rooms.enquiry.id).emit('update', { msg: person.name + ' 加入', time: d.getHours() + ':' + d.getMinutes() });
-            io.to(rooms.enquiry.id).emit('update-persons', rooms.enquiry.persons);
+            //io.to(rooms.enquiry.id).emit('update', { msg: person.name + ' 加入', time: d.getHours() + ':' + d.getMinutes() });
+            //io.to(rooms.enquiry.id).emit('update-persons', rooms.enquiry.persons);
+            _updateUserList();
           }
         });
 
@@ -85,9 +120,29 @@ module.exports = (function () {
         });
 
         socket.on('send', function (data) {
-          console.log(data);
+          console.log(data, persons[socket.id]);
           var d = new Date();
-          socket.broadcast.to(data.to).emit('message', { from: persons[socket.id], content: data.content, time: d.getHours() + ':' + d.getMinutes() });
+          if (data.to) {
+            socket.broadcast.to(data.to).emit('message', { from: persons[socket.id], content: data.content, time: d.getHours() + ':' + d.getMinutes() });
+          }
+          var toPerson = null;
+          if (data.to == 'admin') {
+            toPerson = 'admin';
+          }
+          else if (persons[data.to]) {
+            toPerson = persons[data.to].client_key;
+          }
+          // TODO: send to the guy who once joined and has gone off line
+          else {
+            console.log('target is offline');
+          }
+          db1.Q.fcall(
+            db1.mkPromise(`
+                INSERT INTO conversations SET from_person = '${ persons[socket.id].client_key }', to_person = '${ toPerson }', content = '${ db1.escapeStr(data.content) }'
+            `)
+          ).then(function (res) {
+            console.log(res);
+          });
           socket.emit('message', { from: persons[socket.id], content: data.content, time: d.getHours() + ':' + d.getMinutes() });
         });
 
@@ -95,7 +150,10 @@ module.exports = (function () {
           var newClient = false;
 
           // TODO: error handling
-          if (names.indexOf(data.name) > -1) return;
+          if (names.indexOf(data.name) > -1) {
+            console.log(`has person already ${ data.name }`);
+            return;
+          }
 
           var person = new Person();
 
@@ -107,6 +165,7 @@ module.exports = (function () {
           else {
             newClient = true;
             person.client_key = Helper.keygen(32);
+            person.client_id = Helper.keygen(32);
           }
 
           person.socket_id = socket.id;
@@ -120,9 +179,14 @@ module.exports = (function () {
           }
           else {
             numAnonymous++;
-            var num = numAvailable.pop();
-            numAssigned[socket.id] = num;
-            person.name = '訪客' + num;
+            if (!numAssigned[person.client_key]) {
+              var num = numAvailable.pop();
+              numAssigned[person.client_key] = num;
+              person.name = '訪客' + num;
+            }
+            else {
+              person.name = '訪客' + numAssigned[person.client_key];
+            }
             person.email = '';
             person.type = 'anonymous';
             person.assignation = num;
@@ -130,13 +194,36 @@ module.exports = (function () {
           }
           persons[socket.id] = person;
 
+          db1.Q.fcall(
+            db1.mkPromise(`
+              SELECT id FROM persons WHERE client_key = '${ person.client_key }'
+            `)
+          ).then(function (rows) {
+            var res = rows[0][0];
+            console.log(res);
+            if (!res) {
+              db1.query(`
+                INSERT INTO persons SET name = '${ db1.escapeStr(person.name) }',
+                client_key = '${ person.client_key }',
+                client_id = '${ person.client_id }',
+                type = '${ db1.escapeStr(person.type) }'
+              `, function (res) {
+                console.log(res);
+                _updateUserList();
+              });
+            }
+            else {
+              _updateUserList();
+            }
+          });
+
           socket.join(rooms.enquiry.id);
           rooms.enquiry.persons[socket.id] = person;
 
           socket.emit('joined', { socket_id: person.socket_id, client_key: person.client_key, name: person.name, email: person.email, room: rooms.enquiry.id });
 
-          io.to(rooms.enquiry.id).emit('update', person.name + ' joined');
-          io.to(rooms.enquiry.id).emit('update-persons', rooms.enquiry.persons);
+          //io.to(rooms.enquiry.id).emit('update', person.name + ' joined');
+          io.to(rooms.enquiry.id).emit('update', { socket_id: socket.id, msg: persons[socket.id].name + ' 上線', type: 'user-status' });
 
           var d = new Date();
           var tStr = d.getHours() + ':' + d.getMinutes();
@@ -151,8 +238,24 @@ module.exports = (function () {
           }
         });
 
+        socket.on('clear storage', function () {
+          db1.Q.fcall(
+            db1.mkPromise(`
+              DELETE FROM persons WHERE client_key = '${ persons[socket.id].client_key }'
+            `)
+          ).then(function (res) {
+            console.log(res);
+            _updateUserList();
+          });
+
+          console.log('clear storage');
+          numAvailable.push(numAssigned[persons[socket.id].client_key]);
+          delete numAssigned[persons[socket.id].client_key];
+          console.log(numAvailable, numAssigned);
+        });
+
         socket.on('disconnect', function () {
-          console.log(numAvailable);
+          console.log(numAvailable, numAssigned);
           if (persons[socket.id]) {
             if (persons[socket.id].type == 'admin') {
               loggedInUsers.splice(loggedInUsers.indexOf(persons[socket.id].name), 1);
@@ -160,20 +263,18 @@ module.exports = (function () {
             else if (persons[socket.id].type == 'anonymous') {
               if (numAnonymous > 0)
                 numAnonymous--;
-              numAvailable.push(numAssigned[socket.id]);
-              delete numAssigned[socket.id];
-              console.log(numAvailable, numAssigned);
             }
             console.log(persons[socket.id].name + ' disconnected');
             names.splice(names.indexOf(persons[socket.id].name), 1);
           }
           if (rooms.enquiry.persons[socket.id]) {
             var d = new Date();
-            io.to(rooms.enquiry.id).emit('update', { msg: rooms.enquiry.persons[socket.id].name + ' 離開', time: d.getHours() + ':' + d.getMinutes(), type: 'user-left' });
+            io.to(rooms.enquiry.id).emit('update', { socket_id: socket.id, msg: rooms.enquiry.persons[socket.id].name + ' 離開', type: 'user-status' });
           }
           delete persons[socket.id];
           delete rooms.enquiry.persons[socket.id];
-          io.to(rooms.enquiry.id).emit('update-persons', rooms.enquiry.persons);
+          //io.to(rooms.enquiry.id).emit('update-persons', rooms.enquiry.persons);
+          _updateUserList();
           total--;
         });
       });
