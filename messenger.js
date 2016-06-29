@@ -25,10 +25,14 @@ module.exports = (function () {
     }
   };
 
-  var _updateUserList = function () {
+  var _updateUserList = function (socket) {
     db1.Q.fcall(
       db1.mkPromise(`
-        SELECT * FROM persons WHERE type != 'admin'
+        SELECT P.*, C.content, C.created_at FROM persons P
+          LEFT JOIN conversations C ON ( C.client_id_from = P.client_id AND C.client_id_to = '${ persons[socket.id].client_id }' )
+          OR ( C.client_id_from = '${ persons[socket.id].client_id }' AND C.client_id_to = P.client_id )
+        WHERE P.type != 'admin'
+        GROUP BY P.id
       `)
     ).then(function (rows) {
       var res = rows[0];
@@ -52,6 +56,8 @@ module.exports = (function () {
         sorted.push(resOffline[i]);
       }
       io.to(rooms.enquiry.id).emit('update-persons', sorted);
+    }).catch(function (e) {
+      console.error(e);
     });
   };
 
@@ -133,11 +139,11 @@ module.exports = (function () {
                   type = '${ db1.escapeStr(person.type) }'
                 `, function (res) {
                   console.log(res);
-                  _updateUserList();
+                  _updateUserList(socket);
                 });
               }
               else {
-                _updateUserList();
+                _updateUserList(socket);
               }
             }).catch(function (e) {
               console.error(e);
@@ -295,11 +301,11 @@ module.exports = (function () {
                 type = '${ db1.escapeStr(person.type) }'
               `, function (res) {
                 console.log(res);
-                _updateUserList();
+                _updateUserList(socket);
               });
             }
             else {
-              _updateUserList();
+              _updateUserList(socket);
             }
           }).catch(function (e) {
             console.error(e);
@@ -333,7 +339,7 @@ module.exports = (function () {
             `)
           ).then(function (res) {
             console.log(res);
-            _updateUserList();
+            _updateUserList(socket);
           });
 
           console.log('clear storage');
@@ -362,7 +368,7 @@ module.exports = (function () {
           delete persons[socket.id];
           delete rooms.enquiry.persons[socket.id];
           //io.to(rooms.enquiry.id).emit('update-persons', rooms.enquiry.persons);
-          _updateUserList();
+          _updateUserList(socket);
           total--;
         });
       });
