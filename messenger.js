@@ -151,8 +151,32 @@ module.exports = (function () {
             socket.broadcast.to(invited.socket_id).emit('invited', persons[socket.id]);
           }
           else {
-            console.error('ERROR: no such person. client_id == ' + data.to);
+            console.error('ERROR_EVENT_INVITE: no such person. client_id == ' + data.to);
           }
+
+          // Load conversations with this person
+          db1.Q.all([
+            db1.mkPromise(`
+              SELECT C.client_id_from, C.client_id_to, C.created_at, C.content, NULL as name FROM conversations C
+              WHERE C.client_id_from = '${ data.from }' AND C.client_id_to = '${ data.to }'
+
+              UNION ALL
+
+              SELECT C.client_id_from, C.client_id_to, C.created_at, C.content, P.name FROM conversations C
+                LEFT JOIN persons P ON ( P.client_id = C.client_id_from )
+              WHERE C.client_id_to = '${ data.from }' AND C.client_id_from = '${ data.to }'
+
+              ORDER BY created_at
+            `)(),
+          ]).then(function (rows) {
+            var conversations = rows[0][0];
+            console.log('conv', conversations);
+            socket.emit('load conversations', conversations);
+            var res = rows[0][0][0];
+            console.log(res);
+          }).catch(function (e) {
+            console.error(e);
+          });
         });
 
         socket.on('send', function (data) {
