@@ -68,6 +68,14 @@ module.exports = (function () {
     return (currentTime <= closeTime && currentTime >= openTime);
   };
 
+  var _findPersonByClientId = function (client_id) {
+    console.log('looking for ' + client_id);
+    for (var socket_id in persons) {
+      if (client_id == persons[socket_id].client_id) return persons[socket_id];
+    }
+    return null;
+  };
+
   return {
     init: function (IO) {
       io = IO;
@@ -116,21 +124,33 @@ module.exports = (function () {
         });
 
         socket.on('invite', function (data) {
-          socket.broadcast.to(data.to).emit('invited', persons[data.from]);
+          var invited = _findPersonByClientId(data.to);
+          if (invited) {
+            socket.broadcast.to(invited.socket_id).emit('invited', persons[socket.id]);
+          }
+          else {
+            console.error('ERROR: no such person. client_id == ' + data.to);
+          }
         });
 
         socket.on('send', function (data) {
-          console.log(data, persons[socket.id]);
+          console.log('send event', data);
           var d = new Date();
           if (data.to) {
-            socket.broadcast.to(data.to).emit('message', { from: persons[socket.id], content: data.content, time: d.getHours() + ':' + d.getMinutes() });
+            var receiver = _findPersonByClientId(data.to);
+            if (receiver) {
+              socket.broadcast.to(receiver.socket_id).emit('message', { from: persons[socket.id], content: data.content });
+            }
+            else {
+              console.error('ERROR: no such person. client_id == ' + data.to);
+            }
           }
           var toPerson = null;
           if (data.to == 'admin') {
             toPerson = 'admin';
           }
-          else if (persons[data.to]) {
-            toPerson = persons[data.to].client_key;
+          else if (_findPersonByClientId(data.to)) {
+            toPerson = data.to;
           }
           // TODO: send to the guy who once joined and has gone off line
           else {
@@ -138,7 +158,7 @@ module.exports = (function () {
           }
           db1.Q.fcall(
             db1.mkPromise(`
-                INSERT INTO conversations SET from_person = '${ persons[socket.id].client_key }', to_person = '${ toPerson }', content = '${ db1.escapeStr(data.content) }'
+                INSERT INTO conversations SET client_id_from = '${ persons[socket.id].client_id }', client_id_to = '${ toPerson }', content = '${ db1.escapeStr(data.content) }'
             `)
           ).then(function (res) {
             console.log(res);
@@ -147,19 +167,21 @@ module.exports = (function () {
         });
 
         socket.on('join', function (data) {
+          console.log('join room', data);
           var newClient = false;
 
           // TODO: error handling
           if (names.indexOf(data.name) > -1) {
-            console.log(`has person already ${ data.name }`);
+            console.error(`has person already ${ data.name }`);
             return;
           }
 
           var person = new Person();
 
           // client_key provided, this guy had connection before
-          if (data.client_key) {
+          if (data.client_key && data.client_id) {
             person.client_key = data.client_key;
+            person.client_id = data.client_id;
           }
           // New client_key assigned to those who make first time connection
           else {
@@ -220,7 +242,7 @@ module.exports = (function () {
           socket.join(rooms.enquiry.id);
           rooms.enquiry.persons[socket.id] = person;
 
-          socket.emit('joined', { socket_id: person.socket_id, client_key: person.client_key, name: person.name, email: person.email, room: rooms.enquiry.id });
+          socket.emit('joined', { socket_id: person.socket_id, client_key: person.client_key, client_id: person.client_id, name: person.name, email: person.email, room: rooms.enquiry.id });
 
           //io.to(rooms.enquiry.id).emit('update', person.name + ' joined');
           io.to(rooms.enquiry.id).emit('update', { socket_id: socket.id, msg: persons[socket.id].name + ' 上線', type: 'user-status' });
