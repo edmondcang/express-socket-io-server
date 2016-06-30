@@ -35,7 +35,7 @@ module.exports = (function () {
       db1.mkPromise(`
         SELECT P.*, C.content, C.created_at AS conv_created_at FROM persons P
           LEFT JOIN conversations C
-            ON ( C.client_id_from = P.client_id AND C.client_id_to = '${ persons[socketId].client_id }' )
+            ON ( C.client_id_from = P.client_id AND (C.client_id_to = '${ persons[socketId].client_id }' OR C.client_id_to = 'admin') )
             OR ( C.client_id_from = '${ persons[socketId].client_id }' AND C.client_id_to = P.client_id )
           WHERE P.type != 'admin'
           ORDER BY conv_created_at DESC
@@ -206,17 +206,17 @@ module.exports = (function () {
 
         socket.on('send', function (data) {
           console.log('send event', data);
-          if (persons[socket.id].type == 'admin') {
-            _serveUserList(socket.id);
-          }
+          //if (persons[socket.id].type == 'admin') {
+          //  _serveUserList(socket.id);
+          //}
           var d = new Date();
           if (data.to) {
             var receiver = _findPersonByClientId(data.to);
             if (receiver) {
               socket.broadcast.to(receiver.socket_id).emit('message', { from: persons[socket.id], content: data.content });
-              if (receiver.type == 'admin') {
-                _serveUserList(receiver.socket_id);
-              }
+              //if (receiver.type == 'admin') {
+              //  _serveUserList(receiver.socket_id);
+              //}
             }
             else {
               console.error('ERROR: no such person. client_id == ' + data.to);
@@ -248,6 +248,7 @@ module.exports = (function () {
             console.log(res);
           });
           socket.emit('message', { from: persons[socket.id], content: data.content, time: d.getHours() + ':' + d.getMinutes() });
+          _updateUserList();
         });
 
         socket.on('join', function (data) {
@@ -312,7 +313,7 @@ module.exports = (function () {
 
               SELECT C.client_id_from, C.client_id_to, C.created_at, C.content, P.name FROM conversations C
                 LEFT JOIN persons P ON ( P.client_id = C.client_id_from )
-              WHERE C.client_id_to = '${ person.client_id }' OR C.client_id_to = 'admin'
+              WHERE C.client_id_to = '${ person.client_id }'
 
               ORDER BY created_at
             `)(),
