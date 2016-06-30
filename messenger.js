@@ -283,6 +283,9 @@ module.exports = (function () {
             person.name = data.name;
             //person.email = data.email;
             person.type = 'user';
+            if (numAssigned[person.client_key]) {
+              // TODO: free the number since this guys is nolonger anonymous
+            }
           }
           else {
             numAnonymous++;
