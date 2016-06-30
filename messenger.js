@@ -26,20 +26,32 @@ module.exports = (function () {
   };
 
   var _updateUserList = function (socket) {
+    io.to(rooms.enquiry.id).emit('update-persons');
+  };
+
+  var _serveUserList = function (socketId) {
+    if (!persons[socketId]) return;
     db1.Q.fcall(
       db1.mkPromise(`
-        SELECT P.*, C.content, C.created_at FROM persons P
-          LEFT JOIN conversations C ON ( C.client_id_from = P.client_id AND C.client_id_to = '${ persons[socket.id].client_id }' )
-          OR ( C.client_id_from = '${ persons[socket.id].client_id }' AND C.client_id_to = P.client_id )
-        WHERE P.type != 'admin'
-        GROUP BY P.id
+        SELECT P.*, C.content, C.created_at AS conv_created_at FROM persons P
+          LEFT JOIN conversations C
+            ON ( C.client_id_from = P.client_id AND C.client_id_to = '${ persons[socketId].client_id }' )
+            OR ( C.client_id_from = '${ persons[socketId].client_id }' AND C.client_id_to = P.client_id )
+          WHERE P.type != 'admin'
+          ORDER BY conv_created_at DESC
       `)
     ).then(function (rows) {
       var res = rows[0];
       console.log(res);
       var sorted = [];
       var resOffline = [];
+      var duplicated = 0;
+      var objCounts = {};
       for (var i in res) {
+        if (i > 0 && res[i].client_id == res[i-1].client_id) {
+          objCounts[res[i].client_id] ? ++objCounts[res[i].client_id] : objCounts[res[i].client_id] = 1;
+          continue;
+        }
         for (var socket_id in rooms.enquiry.persons) {
           if (rooms.enquiry.persons[socket_id].client_key == res[i].client_key) {
             res[i].socket_id = socket_id;
@@ -55,7 +67,10 @@ module.exports = (function () {
       for (var i in resOffline) {
         sorted.push(resOffline[i]);
       }
-      io.to(rooms.enquiry.id).emit('update-persons', sorted);
+      for (var i in sorted) {
+        sorted[i].num_conv = objCounts[sorted[i].client_id] ? objCounts[sorted[i].client_id]+1 : 0;
+      }
+      io.sockets.connected[socketId].emit('serve user list', sorted);
     }).catch(function (e) {
       console.error(e);
     });
@@ -95,6 +110,10 @@ module.exports = (function () {
           socket.emit('connection', { event: 'connection', accepted: true });
           total++;
         }
+
+        socket.on('request user list', function (socketId) {
+          _serveUserList(socketId);
+        });
 
         socket.on('login', function (data) {
           //if (admins[data.name] && admins[data.name] == data.password) {
@@ -333,6 +352,7 @@ module.exports = (function () {
         });
 
         socket.on('clear storage', function () {
+          if (!persons[socket.id]) return;
           db1.Q.fcall(
             db1.mkPromise(`
               DELETE FROM persons WHERE client_key = '${ persons[socket.id].client_key }'
