@@ -189,7 +189,7 @@ module.exports = (function () {
 
               SELECT C.client_id_from, C.client_id_to, C.created_at, C.content, P.name FROM conversations C
                 LEFT JOIN persons P ON ( P.client_id = C.client_id_from )
-              WHERE C.client_id_to = '${ data.from }' AND C.client_id_from = '${ data.to }'
+              WHERE ( C.client_id_to = '${ data.from }' OR C.client_id_to = 'admin' ) AND C.client_id_from = '${ data.to }'
 
               ORDER BY created_at
             `)(),
@@ -206,11 +206,17 @@ module.exports = (function () {
 
         socket.on('send', function (data) {
           console.log('send event', data);
+          if (persons[socket.id].type == 'admin') {
+            _serveUserList(socket.id);
+          }
           var d = new Date();
           if (data.to) {
             var receiver = _findPersonByClientId(data.to);
             if (receiver) {
               socket.broadcast.to(receiver.socket_id).emit('message', { from: persons[socket.id], content: data.content });
+              if (receiver.type == 'admin') {
+                _serveUserList(receiver.socket_id);
+              }
             }
             else {
               console.error('ERROR: no such person. client_id == ' + data.to);
@@ -223,18 +229,22 @@ module.exports = (function () {
           else if (_findPersonByClientId(data.to)) {
             toPerson = data.to;
           }
+          // Send to the guy who once joined and has gone off line
           else if (typeof data.to == 'string' && data.to.length) {
             toPerson = data.to;
           }
-          // TODO: send to the guy who once joined and has gone off line
+          // TODO: this is to admin
           else {
-            console.log('target is offline');
+            console.log('to admin');
+            toPerson = 'admin';
           }
-          db1.Q.fcall(
+          var promises = [];
+          promises.push(
             db1.mkPromise(`
                 INSERT INTO conversations SET client_id_from = '${ persons[socket.id].client_id }', client_id_to = '${ toPerson }', content = '${ db1.escapeStr(data.content) }'
-            `)
-          ).then(function (res) {
+            `)()
+          );
+          db1.Q.all(promises).then(function (res) {
             console.log(res);
           });
           socket.emit('message', { from: persons[socket.id], content: data.content, time: d.getHours() + ':' + d.getMinutes() });
@@ -302,7 +312,7 @@ module.exports = (function () {
 
               SELECT C.client_id_from, C.client_id_to, C.created_at, C.content, P.name FROM conversations C
                 LEFT JOIN persons P ON ( P.client_id = C.client_id_from )
-              WHERE C.client_id_to = '${ person.client_id }'
+              WHERE C.client_id_to = '${ person.client_id }' OR C.client_id_to = 'admin'
 
               ORDER BY created_at
             `)(),
