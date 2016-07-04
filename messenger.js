@@ -122,8 +122,9 @@ module.exports = (function () {
           if (data.name) {
 
             if (loggedInUsers.indexOf(data.name) > -1) {
-              console.log(data.name + ' already logged in');
+              console.error('ERROR_ALREADY_LOGGED_IN', data.name);
               console.log(loggedInUsers);
+              socket.emit('ERROR_ALREADY_LOGGED_IN');
               return;
             }
 
@@ -215,7 +216,7 @@ module.exports = (function () {
           if (data.to) {
             var receiver = _findPersonByClientId(data.to);
             if (receiver) {
-              socket.broadcast.to(receiver.socket_id).emit('message', { from: persons[socket.id], content: data.content });
+              socket.broadcast.to(receiver.socket_id).emit('message', { from: persons[socket.id], content: data.content, type: data.type });
               //if (receiver.type == 'admin') {
               //  _serveUserList(receiver.socket_id);
               //}
@@ -243,13 +244,16 @@ module.exports = (function () {
           var promises = [];
           promises.push(
             db1.mkPromise(`
-                INSERT INTO conversations SET client_id_from = '${ persons[socket.id].client_id }', client_id_to = '${ toPerson }', content = '${ db1.escapeStr(data.content) }'
+                INSERT INTO conversations SET client_id_from = '${ persons[socket.id].client_id }'
+                  , client_id_to = '${ toPerson }'
+                  , content = '${ db1.escapeStr(data.content) }'
+                  ${ data.type ? ", type = '${ db1.escapeStr(data.type) }'" : '' }
             `)()
           );
           db1.Q.all(promises).then(function (res) {
             console.log(res);
           });
-          socket.emit('message', { from: persons[socket.id], content: data.content, time: d.getHours() + ':' + d.getMinutes() });
+          socket.emit('message', { from: persons[socket.id], content: data.content, type: data.type, time: d.getHours() + ':' + d.getMinutes() });
           _updateUserList();
         });
 
