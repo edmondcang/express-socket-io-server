@@ -47,11 +47,13 @@ module.exports = (function () {
       var resOffline = [];
       var duplicated = 0;
       var objCounts = {};
+      var clientIdList = [];
       for (var i in res) {
-        if (i > 0 && res[i].client_id == res[i-1].client_id) {
+        if (clientIdList.indexOf(res[i].client_id) > -1) {
           objCounts[res[i].client_id] ? ++objCounts[res[i].client_id] : objCounts[res[i].client_id] = 1;
           continue;
         }
+        clientIdList.push(res[i].client_id);
         for (var socket_id in rooms.enquiry.persons) {
           if (rooms.enquiry.persons[socket_id].client_key == res[i].client_key) {
             res[i].socket_id = socket_id;
