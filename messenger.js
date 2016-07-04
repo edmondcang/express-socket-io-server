@@ -308,7 +308,7 @@ module.exports = (function () {
 
           db1.Q.all([
             db1.mkPromise(`
-              SELECT id FROM persons WHERE client_key = '${ person.client_key }'
+              SELECT * FROM persons WHERE client_key = '${ person.client_key }'
             `)(),
             db1.mkPromise(`
               SELECT C.client_id_from, C.client_id_to, C.created_at, C.content, NULL as name FROM conversations C
@@ -327,7 +327,7 @@ module.exports = (function () {
             console.log('conv', conversations);
             socket.emit('load conversations', conversations);
             var res = rows[0][0][0];
-            console.log(res);
+            console.log('user', res);
             if (!res) {
               db1.query(`
                 INSERT INTO persons SET name = '${ db1.escapeStr(person.name) }',
@@ -340,7 +340,17 @@ module.exports = (function () {
               });
             }
             else {
-              _updateUserList(socket);
+              if (person.name != res.name) {
+                db1.query(`
+                  UPDATE persons SET name = '${ person.name }' WHERE client_id = '${ person.client_id }'
+                `, function (res) {
+                  console.log(res);
+                  _updateUserList(socket);
+                });
+              }
+              else {
+                _updateUserList(socket);
+              }
             }
           }).catch(function (e) {
             console.error(e);
