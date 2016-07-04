@@ -346,6 +346,9 @@ module.exports = (function () {
                 `, function (res) {
                   console.log(res);
                   _updateUserList(socket);
+                  // Free the number
+                  if (numAssigned[persons[socket.id].client_key])
+                    numAvailable.push(numAssigned[persons[socket.id].client_key]);
                 });
               }
               else {
