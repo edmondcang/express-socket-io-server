@@ -347,8 +347,9 @@ module.exports = (function () {
                   console.log(res);
                   _updateUserList(socket);
                   // Free the number
-                  if (numAssigned[persons[socket.id].client_key])
-                    numAvailable.push(numAssigned[persons[socket.id].client_key]);
+                  var n = numAssigned[persons[socket.id].client_key];
+                  if (n && numAvailable.indexOf(n) < 0)
+                    numAvailable.push(n);
                 });
               }
               else {
@@ -380,6 +381,20 @@ module.exports = (function () {
           }
         });
 
+        socket.on('typing', function (to_client_id) {
+          var person = _findPersonByClientId(to_client_id);
+          if (person) {
+            socket.broadcast.to(person.socket_id).emit('typing');
+          }
+        });
+
+        socket.on('clear typing', function (to_client_id) {
+          var person = _findPersonByClientId(to_client_id);
+          if (person) {
+            socket.broadcast.to(person.socket_id).emit('clear typing');
+          }
+        });
+
         socket.on('clear storage', function () {
           if (!persons[socket.id]) return;
           db1.Q.fcall(
@@ -392,7 +407,10 @@ module.exports = (function () {
           });
 
           console.log('clear storage');
-          numAvailable.push(numAssigned[persons[socket.id].client_key]);
+          var n = numAssigned[persons[socket.id].client_key];
+          if (n && numAvailable.indexOf(n) < 0)
+            numAvailable.push(n);
+          //numAvailable.push(numAssigned[persons[socket.id].client_key]);
           delete numAssigned[persons[socket.id].client_key];
           console.log(numAvailable, numAssigned);
         });
