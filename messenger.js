@@ -33,7 +33,7 @@ module.exports = (function () {
     if (!persons[socketId]) return;
     db1.Q.fcall(
       db1.mkPromise(`
-        SELECT P.*, C.content, C.created_at AS conv_created_at FROM persons P
+        SELECT P.*, C.content, C.type, C.created_at AS conv_created_at FROM persons P
           LEFT JOIN conversations C
             ON ( C.client_id_from = P.client_id AND (C.client_id_to = '${ persons[socketId].client_id }' OR C.client_id_to = 'admin') )
             OR ( C.client_id_from = '${ persons[socketId].client_id }' AND C.client_id_to = P.client_id )
@@ -185,12 +185,12 @@ module.exports = (function () {
           // Load conversations with this person
           db1.Q.all([
             db1.mkPromise(`
-              SELECT C.client_id_from, C.client_id_to, C.created_at, C.content, NULL as name FROM conversations C
+              SELECT C.client_id_from, C.client_id_to, C.created_at, C.content, C.type, NULL as name FROM conversations C
               WHERE C.client_id_from = '${ data.from }' AND C.client_id_to = '${ data.to }'
 
               UNION ALL
 
-              SELECT C.client_id_from, C.client_id_to, C.created_at, C.content, P.name FROM conversations C
+              SELECT C.client_id_from, C.client_id_to, C.created_at, C.content, C.type, P.name FROM conversations C
                 LEFT JOIN persons P ON ( P.client_id = C.client_id_from )
               WHERE ( C.client_id_to = '${ data.from }' OR C.client_id_to = 'admin' ) AND C.client_id_from = '${ data.to }'
 
@@ -247,7 +247,7 @@ module.exports = (function () {
                 INSERT INTO conversations SET client_id_from = '${ persons[socket.id].client_id }'
                   , client_id_to = '${ toPerson }'
                   , content = '${ db1.escapeStr(data.content) }'
-                  ${ data.type ? ", type = '${ db1.escapeStr(data.type) }'" : '' }
+                  ${ data.type ? ", type = '" + db1.escapeStr(data.type) + "'" : '' }
             `)()
           );
           db1.Q.all(promises).then(function (res) {
@@ -315,12 +315,12 @@ module.exports = (function () {
               SELECT * FROM persons WHERE client_key = '${ person.client_key }'
             `)(),
             db1.mkPromise(`
-              SELECT C.client_id_from, C.client_id_to, C.created_at, C.content, NULL as name FROM conversations C
+              SELECT C.client_id_from, C.client_id_to, C.created_at, C.content, C.type, NULL as name FROM conversations C
               WHERE C.client_id_from = '${ person.client_id }'
 
               UNION ALL
 
-              SELECT C.client_id_from, C.client_id_to, C.created_at, C.content, P.name FROM conversations C
+              SELECT C.client_id_from, C.client_id_to, C.created_at, C.content, C.type, P.name FROM conversations C
                 LEFT JOIN persons P ON ( P.client_id = C.client_id_from )
               WHERE C.client_id_to = '${ person.client_id }'
 

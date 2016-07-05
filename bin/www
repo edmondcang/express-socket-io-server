@@ -8,11 +8,10 @@ var fs = require('fs');
 var app = require('../app');
 var debug = require('debug')('express-socket-io-server:server');
 var http = require('http');
-var https = require('https');
+//var https = require('https');
 var messenger = require('../messenger');
 
-var port = normalizePort(process.env.PORT || '3000');
-var portSocket = normalizePort(process.env.PORT_SOCKET || '4000');
+var port = normalizePort(process.env.PORT || '4000');
 
 app.set('port', port);
 
@@ -20,15 +19,15 @@ app.set('port', port);
  * Create HTTP server.
  */
 
-var credentials = {
+//var credentials = {
   //key: fs.readFileSync('/home/admin0/Certificates/mars.shoppinggai.com.key'),
   //crt: fs.readFileSync('/home/admin0/Certificates/mars.shoppinggai.com.crt'),
-};
+//};
 
+//var server = http.createServer(app);
+//var server = https.createServer(credentials);
 var server = http.createServer(app);
-//var socketServer = https.createServer(credentials);
-var socketServer = http.createServer();
-var io = require('socket.io')(socketServer);
+var io = require('socket.io')(server);
 
 messenger.init(io);
 
@@ -40,10 +39,10 @@ server.listen(port);
 server.on('error', onError);
 server.on('listening', onListening);
 
-socketServer.listen(portSocket);
-socketServer.on('listening', function () {
-  debug('Socket server listening on port ' + portSocket);
-});
+//server.listen(port);
+//server.on('listening', function () {
+//  debug('Socket server listening on port ' + port);
+//});
 
 /**
  * Normalize a port into a number, string, or false.
