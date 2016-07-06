@@ -141,7 +141,8 @@ module.exports = (function () {
             socket.join(rooms.enquiry.id);
             rooms.enquiry.persons[socket.id] = person;
 
-            socket.emit('logged-in', person);
+            socket.emit('joined', person);
+            //socket.emit('logged-in', person);
             //socket.emit('logged-in', { client_key: person.client_key, socket_id: socket.id, name: person.name, room: rooms.enquiry.id });
 
             var d = new Date();
@@ -289,9 +290,10 @@ module.exports = (function () {
             person.name = data.name;
             //person.email = data.email;
             person.type = 'user';
-            if (numAssigned[person.client_key]) {
-              // TODO: free the number since this guys is nolonger anonymous
-            }
+              // Free the number since this guys is nolonger anonymous
+              var n = numAssigned[person.client_key];
+              if (n && numAvailable.indexOf(n) < 0)
+                numAvailable.push(n);
           }
           else {
             numAnonymous++;
@@ -308,6 +310,7 @@ module.exports = (function () {
             person.assignation = num;
             console.log(numAvailable, numAssigned);
           }
+
           persons[socket.id] = person;
 
           db1.Q.all([
@@ -367,7 +370,9 @@ module.exports = (function () {
           socket.join(rooms.enquiry.id);
           rooms.enquiry.persons[socket.id] = person;
 
-          socket.emit('joined', { socket_id: person.socket_id, client_key: person.client_key, client_id: person.client_id, name: person.name, email: person.email, room: rooms.enquiry.id });
+          socket.emit('joined', {
+            socket_id: person.socket_id, client_key: person.client_key, client_id: person.client_id, name: person.name, type: person.type, email: person.email, room: rooms.enquiry.id
+          });
 
           //io.to(rooms.enquiry.id).emit('update', person.name + ' joined');
           io.to(rooms.enquiry.id).emit('update', { client_id: persons[socket.id].client_id, socket_id: socket.id, msg: persons[socket.id].name + ' 上線', type: 'user-status' });
