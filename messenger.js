@@ -4,6 +4,12 @@ var Helper = require('./Helper');
 var Person = function () {
 };
 
+var Room = function (id, name) {
+  this.id = id;
+  this.name = name;
+  this.persons = {};
+};
+
 module.exports = (function () {
   var io = null;
   var timezoneAdjust = 8;
@@ -25,18 +31,24 @@ module.exports = (function () {
     }
   };
 
-  var _updateUserList = function (socket) {
-    io.to(rooms.enquiry.id).emit('update-persons');
+  var _updateUserList = function (room) {
+    room = room || 'enquiry';
+    if (!rooms[room]) {
+      rooms[room] = new Room(room, room);
+    }
+    io.to(rooms[room].id).emit('update-persons');
+    console.log(rooms);
   };
 
   var _serveUserList = function (socketId) {
     if (!persons[socketId]) return;
+    var room = persons[socketId].room || 'enquiry';
     db1.Q.fcall(
       db1.mkPromise(`
         SELECT P.*, C.content, C.type, C.created_at AS conv_created_at FROM persons P
           LEFT JOIN conversations C
-            ON ( C.client_id_from = P.client_id AND (C.client_id_to = '${ persons[socketId].client_id }' OR C.client_id_to = 'admin') )
-            OR ( C.client_id_from = '${ persons[socketId].client_id }' AND C.client_id_to = P.client_id )
+            ON ( C.room = '${ room }' AND C.client_id_from = P.client_id AND (C.client_id_to = '${ persons[socketId].client_id }' OR C.client_id_to = 'admin') )
+            OR ( C.room = '${ room }' AND C.client_id_from = '${ persons[socketId].client_id }' AND C.client_id_to = P.client_id )
           WHERE P.type != 'admin'
           ORDER BY conv_created_at DESC
       `)
@@ -54,8 +66,8 @@ module.exports = (function () {
           continue;
         }
         clientIdList.push(res[i].client_id);
-        for (var socket_id in rooms.enquiry.persons) {
-          if (rooms.enquiry.persons[socket_id].client_key == res[i].client_key) {
+        for (var socket_id in rooms[room].persons) {
+          if (rooms[room].persons[socket_id].client_key == res[i].client_key) {
             res[i].socket_id = socket_id;
           }
         }
@@ -113,8 +125,9 @@ module.exports = (function () {
           total++;
         }
 
-        socket.on('request user list', function (socketId) {
-          _serveUserList(socketId);
+        socket.on('request user list', function (data) {
+          var room = data.room || 'enquiry';
+          _serveUserList(data.socket_id, room);
         });
 
         socket.on('login', function (data) {
@@ -135,6 +148,7 @@ module.exports = (function () {
             person.client_id = data.client_id || Helper.keygen(32);
             person.socket_id = socket.id;
             person.name = data.name;
+            person.room = data.room;
             person.type = 'admin';
             persons[socket.id] = person;
 
@@ -162,11 +176,11 @@ module.exports = (function () {
                   type = '${ db1.escapeStr(person.type) }'
                 `, function (res) {
                   console.log(res);
-                  _updateUserList(socket);
+                  _updateUserList(person.room);
                 });
               }
               else {
-                _updateUserList(socket);
+                _updateUserList(person.room);
               }
             }).catch(function (e) {
               console.error(e);
@@ -186,7 +200,7 @@ module.exports = (function () {
           // Load conversations with this person
           db1.Q.all([
             db1.mkPromise(`
-              SELECT C.client_id_from, C.client_id_to, C.created_at, C.content, C.type, NULL as name FROM conversations C
+              SELECT C.client_id_from, C.client_id_to, C.created_at, C.content, C.type, NULL AS name FROM conversations C
               WHERE C.client_id_from = '${ data.from }' AND C.client_id_to = '${ data.to }'
 
               UNION ALL
@@ -242,10 +256,14 @@ module.exports = (function () {
             console.log('to admin');
             toPerson = 'admin';
           }
+
+          var room = persons[socket.id].room || 'enquiry';
+
           var promises = [];
           promises.push(
             db1.mkPromise(`
                 INSERT INTO conversations SET client_id_from = '${ persons[socket.id].client_id }'
+                  , room = '${ room }'
                   , client_id_to = '${ toPerson }'
                   , content = '${ db1.escapeStr(data.content) }'
                   ${ data.type ? ", type = '" + db1.escapeStr(data.type) + "'" : '' }
@@ -255,7 +273,7 @@ module.exports = (function () {
             console.log(res);
           });
           socket.emit('message', { from: persons[socket.id], content: data.content, type: data.type, time: d.getHours() + ':' + d.getMinutes() });
-          _updateUserList();
+          _updateUserList(persons[socket.id].room);
         });
 
         socket.on('join', function (data) {
@@ -283,6 +301,7 @@ module.exports = (function () {
           }
 
           person.socket_id = socket.id;
+          person.room = data.room || 'enquiry';
 
           //if (data.name && data.email) {
           if (data.name) {
@@ -311,6 +330,8 @@ module.exports = (function () {
             console.log(numAvailable, numAssigned);
           }
 
+          console.log('who is this person ?', person);
+
           persons[socket.id] = person;
 
           db1.Q.all([
@@ -319,13 +340,13 @@ module.exports = (function () {
             `)(),
             db1.mkPromise(`
               SELECT C.client_id_from, C.client_id_to, C.created_at, C.content, C.type, NULL as name FROM conversations C
-              WHERE C.client_id_from = '${ person.client_id }'
+              WHERE C.client_id_from = '${ person.client_id }' AND C.room = '${ person.room }'
 
               UNION ALL
 
               SELECT C.client_id_from, C.client_id_to, C.created_at, C.content, C.type, P.name FROM conversations C
                 LEFT JOIN persons P ON ( P.client_id = C.client_id_from )
-              WHERE C.client_id_to = '${ person.client_id }'
+              WHERE C.client_id_to = '${ person.client_id }' AND C.room = '${ person.room }'
 
               ORDER BY created_at
             `)(),
@@ -343,7 +364,7 @@ module.exports = (function () {
                 type = '${ db1.escapeStr(person.type) }'
               `, function (res) {
                 console.log(res);
-                _updateUserList(socket);
+                _updateUserList(person.room);
               });
             }
             else {
@@ -352,7 +373,7 @@ module.exports = (function () {
                   UPDATE persons SET name = '${ person.name }' WHERE client_id = '${ person.client_id }'
                 `, function (res) {
                   console.log(res);
-                  _updateUserList(socket);
+                  _updateUserList(person.room);
                   // Free the number
                   var n = numAssigned[persons[socket.id].client_key];
                   if (n && numAvailable.indexOf(n) < 0)
@@ -360,22 +381,27 @@ module.exports = (function () {
                 });
               }
               else {
-                _updateUserList(socket);
+                _updateUserList(person.room);
               }
             }
           }).catch(function (e) {
             console.error(e);
           });
 
-          socket.join(rooms.enquiry.id);
-          rooms.enquiry.persons[socket.id] = person;
+          var roomId = person.room || 'enquiry';
+          if (!rooms[roomId]) {
+            rooms[roomId] = new Room(roomId, roomId);
+          }
+          rooms[roomId].persons[socket.id] = person;
+
+          socket.join(roomId);
 
           socket.emit('joined', {
-            socket_id: person.socket_id, client_key: person.client_key, client_id: person.client_id, name: person.name, type: person.type, email: person.email, room: rooms.enquiry.id
+            socket_id: person.socket_id, client_key: person.client_key, client_id: person.client_id, name: person.name, type: person.type, email: person.email, room: rooms[roomId].id
           });
 
           //io.to(rooms.enquiry.id).emit('update', person.name + ' joined');
-          io.to(rooms.enquiry.id).emit('update', { client_id: persons[socket.id].client_id, socket_id: socket.id, msg: persons[socket.id].name + ' 上線', type: 'user-status' });
+          io.to(rooms[roomId].id).emit('update', { client_id: persons[socket.id].client_id, socket_id: socket.id, msg: persons[socket.id].name + ' 上線', type: 'user-status' });
 
           var d = new Date();
           var tStr = d.getHours() + ':' + d.getMinutes();
@@ -412,7 +438,7 @@ module.exports = (function () {
             `)
           ).then(function (res) {
             console.log(res);
-            _updateUserList(socket);
+            _updateUserList(persons[socket.id].room);
           });
 
           console.log('clear storage');
@@ -426,7 +452,9 @@ module.exports = (function () {
 
         socket.on('disconnect', function () {
           console.log(numAvailable, numAssigned);
+          var room = 'enquiry';
           if (persons[socket.id]) {
+            room = persons[socket.id].room || 'enquiry';
             if (persons[socket.id].type == 'admin') {
               loggedInUsers.splice(loggedInUsers.indexOf(persons[socket.id].name), 1);
             }
@@ -437,14 +465,14 @@ module.exports = (function () {
             console.log(persons[socket.id].name + ' disconnected');
             names.splice(names.indexOf(persons[socket.id].name), 1);
           }
-          if (rooms.enquiry.persons[socket.id]) {
+          if (rooms[room].persons[socket.id]) {
             var d = new Date();
-            io.to(rooms.enquiry.id).emit('update', { client_id: persons[socket.id].client_id, socket_id: socket.id, msg: persons[socket.id].name + ' 離線', type: 'user-status' });
+            io.to(rooms[room].id).emit('update', { client_id: persons[socket.id].client_id, socket_id: socket.id, msg: persons[socket.id].name + ' 離線', type: 'user-status' });
           }
           delete persons[socket.id];
-          delete rooms.enquiry.persons[socket.id];
+          delete rooms[room].persons[socket.id];
           //io.to(rooms.enquiry.id).emit('update-persons', rooms.enquiry.persons);
-          _updateUserList(socket);
+          _updateUserList(room);
           total--;
         });
       });
