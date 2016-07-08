@@ -8,6 +8,7 @@ var Room = function (id, name) {
   this.id = id;
   this.name = name;
   this.persons = {};
+  this.footprints = [];
 };
 
 module.exports = (function () {
@@ -27,7 +28,8 @@ module.exports = (function () {
     enquiry: {
       id: 'enquiry',
       name: 'Enquiry Room',
-      persons: {}
+      persons: {},
+      footprints: [],
     }
   };
 
@@ -43,6 +45,11 @@ module.exports = (function () {
     io.to(rooms[room].id).emit('update-persons');
     console.log(rooms);
   };
+
+  var _findClientInRoom = function (client_id, room) {
+    if (!rooms[room]) return false;
+    return rooms[room].footprints.indexOf(client_id) > -1;
+  }
 
   var _serveUserList = function (socketId) {
     if (!persons[socketId]) return;
@@ -69,6 +76,7 @@ module.exports = (function () {
           objCounts[res[i].client_id] ? ++objCounts[res[i].client_id] : objCounts[res[i].client_id] = 1;
           continue;
         }
+        if (!_findClientInRoom(res[i].client_id, room)) continue;
         clientIdList.push(res[i].client_id);
         for (var socket_id in rooms[room].persons) {
           if (rooms[room].persons[socket_id].client_key == res[i].client_key) {
@@ -393,6 +401,7 @@ module.exports = (function () {
             rooms[roomId] = new Room(roomId, roomId);
           }
           rooms[roomId].persons[socket.id] = person;
+          rooms[roomId].footprints.push(person.client_id);
 
           socket.join(roomId);
 
@@ -432,12 +441,15 @@ module.exports = (function () {
 
         socket.on('clear storage', function () {
           if (!persons[socket.id]) return;
+          var room = persons[socket.id].room;
           db1.Q.fcall(
             db1.mkPromise(`
               DELETE FROM persons WHERE client_key = '${ persons[socket.id].client_key }'
             `)
           ).then(function (res) {
             console.log(res);
+            if (rooms[room])
+              rooms[room].footprints.splice(rooms[room].footprints.indexOf(persons[socket.id].client_id), 1);
             _updateUserList(persons[socket.id].room);
           });
 
@@ -478,9 +490,10 @@ module.exports = (function () {
             if (rooms[room])
               io.to(room).emit('update', data);
           }
-          delete persons[socket.id];
-          if (rooms[room])
+          if (rooms[room]) {
             delete rooms[room].persons[socket.id];
+          }
+          delete persons[socket.id];
           //io.to(rooms.enquiry.id).emit('update-persons', rooms.enquiry.persons);
           _updateUserList(room);
           total--;
