@@ -53,7 +53,7 @@ module.exports = (function () {
           LEFT JOIN conversations C
             ON ( C.room = '${ room }' AND C.client_id_from = P.client_id AND (C.client_id_to = '${ persons[socketId].client_id }' OR C.client_id_to = 'admin') )
             OR ( C.room = '${ room }' AND C.client_id_from = '${ persons[socketId].client_id }' AND C.client_id_to = P.client_id )
-          WHERE P.type != 'admin'
+          WHERE P.type != 'admin' AND P.client_id != '${ persons[socketId].client_id }'
           ORDER BY conv_created_at DESC
       `)
     ).then(function (rows) {
@@ -463,14 +463,24 @@ module.exports = (function () {
                 numAnonymous--;
             }
             console.log(persons[socket.id].name + ' disconnected');
+            console.log('room: ', room);
             names.splice(names.indexOf(persons[socket.id].name), 1);
           }
           if (rooms[room].persons[socket.id]) {
             var d = new Date();
-            io.to(rooms[room].id).emit('update', { client_id: persons[socket.id].client_id, socket_id: socket.id, msg: persons[socket.id].name + ' 離線', type: 'user-status' });
+            var data = {
+              client_id: persons[socket.id].client_id,
+              socket_id: socket.id,
+              msg: persons[socket.id].name + ' 離線',
+              type: 'user-status'
+            };
+            console.log('update', data);
+            if (rooms[room])
+              io.to(room).emit('update', data);
           }
           delete persons[socket.id];
-          delete rooms[room].persons[socket.id];
+          if (rooms[room])
+            delete rooms[room].persons[socket.id];
           //io.to(rooms.enquiry.id).emit('update-persons', rooms.enquiry.persons);
           _updateUserList(room);
           total--;
