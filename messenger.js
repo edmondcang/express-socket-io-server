@@ -31,6 +31,10 @@ module.exports = (function () {
     }
   };
 
+  for (var i = maxConn; i >= 1; i--) {
+    numAvailable.push(i);
+  }
+
   var _updateUserList = function (room) {
     room = room || 'enquiry';
     if (!rooms[room]) {
@@ -89,10 +93,6 @@ module.exports = (function () {
       console.error(e);
     });
   };
-
-  for (var i = maxConn; i >= 1; i--) {
-    numAvailable.push(i);
-  }
 
   var _inTimeRange = function () {
     var d = new Date();
