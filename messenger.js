@@ -25,12 +25,7 @@ module.exports = (function () {
   var names = [];
   var persons = {};
   var rooms = {
-    enquiry: {
-      id: 'enquiry',
-      name: 'Enquiry Room',
-      persons: {},
-      footprints: [],
-    }
+    enquiry: new Room('enquiry', 'Enquiry')
   };
 
   for (var i = maxConn; i >= 1; i--) {
@@ -401,7 +396,8 @@ module.exports = (function () {
             rooms[roomId] = new Room(roomId, roomId);
           }
           rooms[roomId].persons[socket.id] = person;
-          rooms[roomId].footprints.push(person.client_id);
+          if (!_findClientInRoom(person.client_id, roomId))
+            rooms[roomId].footprints.push(person.client_id);
 
           socket.join(roomId);
 
